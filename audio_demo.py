@@ -6,6 +6,8 @@ import struct
 import matplotlib.pyplot as plt
 import numpy
 import time
+import os
+<<<<<<< HEAD
 import socket
 
 # client stuff:
@@ -14,12 +16,35 @@ PORT = 65432
 
 tcpSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 tcpSocket.connect((IP, PORT))
+=======
 
-if len(sys.argv) < 2 or not sys.argv[1].endswith(".wav"):
+>>>>>>> c65427c5b15aa2f9669703ae187d41baa71009c2
+
+
+if len(sys.argv) < 2:
     print("Plays a wave file.\n\nUsage: %s filename.wav" % sys.argv[0])
     sys.exit(-1)
 
-wf = wave.open(sys.argv[1], 'rb')
+# find music file in specific folder (only for me right now)
+fileToPlay = ""
+
+musicDirectoryRelative = "../files"
+
+# if / then assume exact path
+if sys.argv[1].find("/") != -1 and sys.argv[1].endswith(".wav"):
+    fileToPlay = sys.argv[1]
+
+# else, look for the song file in the music folder
+else:
+    for file in os.listdir(musicDirectoryRelative):
+        if file.endswith(".wav") and file.find(sys.argv[1]) != -1:
+            fileToPlay = musicDirectoryRelative + "/" + file
+
+try:
+    wf = wave.open(fileToPlay, 'rb')
+except FileNotFoundError:
+    print("File not found.")
+    sys.exit(-1)
 
 # pyaudio for audio streaming
 p = pyaudio.PyAudio()
@@ -58,7 +83,7 @@ ax.set_facecolor("k")
 fig.set_facecolor("k")
 fig.show()
 
-nameOfFile = sys.argv[1].split("/")[-1]
+nameOfFile = fileToPlay.split("/")[-1]
 print(f"Playing: {nameOfFile}!")
 
 timeStartPlaying = time.time()
