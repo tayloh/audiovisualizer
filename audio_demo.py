@@ -6,6 +6,14 @@ import struct
 import matplotlib.pyplot as plt
 import numpy
 import time
+import socket
+
+# client stuff:
+IP = "127.0.0.1"
+PORT = 65432
+
+tcpSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+tcpSocket.connect((IP, PORT))
 
 if len(sys.argv) < 2 or not sys.argv[1].endswith(".wav"):
     print("Plays a wave file.\n\nUsage: %s filename.wav" % sys.argv[0])
@@ -78,7 +86,7 @@ while len(data) > 0:
 
     # write frames to the audio stream to make sound
     stream.write(data)
-
+    tcpSocket.sendall(data)
     # reads frames, maybe this one reads frames in the speed specified by samplerate?
     data = wf.readframes(CHUNK)
 
@@ -104,6 +112,9 @@ songLengthInSeconds = timeStopPlaying - timeStartPlaying
 
 print("Writes per second:", loopCount / songLengthInSeconds)
 print("Song ended!")
+
+# close tcp socket
+tcpSocket.close()
 
 # close the audio stream
 stream.stop_stream()
