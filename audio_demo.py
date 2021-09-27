@@ -7,7 +7,6 @@ import matplotlib.pyplot as plt
 import numpy
 import time
 import os
-<<<<<<< HEAD
 import socket
 
 # client stuff:
@@ -16,9 +15,6 @@ PORT = 65432
 
 tcpSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 tcpSocket.connect((IP, PORT))
-=======
-
->>>>>>> c65427c5b15aa2f9669703ae187d41baa71009c2
 
 
 if len(sys.argv) < 2:
