@@ -37,7 +37,7 @@ except FileNotFoundError:
 p = pyaudio.PyAudio()
 
 # get values from wav header
-CHUNK = 1024 * 2 # had to increase chunk size or it started to lag
+CHUNK = 1024 * 3 # had to increase chunk size or it started to lag
 FORMAT = p.get_format_from_width(wf.getsampwidth())
 CHANNELS = wf.getnchannels()
 SAMPLERATE = wf.getframerate()

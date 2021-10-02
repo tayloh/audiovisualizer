@@ -96,13 +96,6 @@ while len(data) > 0:
     # reads frames, maybe this one reads frames in the speed specified by samplerate?
     data = wf.readframes(CHUNK)
 
-    # dataInt is an array of ints of size CHUNK!
-    try:
-        dataInt = struct.unpack(str(CHUNK) + "i", data)
-
-    except struct.error as e:
-        print("Could not unpack wav data: ", e)
-
 ############ Play audio and stream data to pi ############
 
 ############ Shutdown ############
