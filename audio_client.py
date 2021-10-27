@@ -1,12 +1,11 @@
 # Takes a music file, plays it, does the fft and amplitude calculations. 
 # Sends the results to the pi server.
 
-import pyaudio
-import wave
 import sys
-import struct
 import os
 import socket
+import pyaudio
+import wave
 
 ############ Check user input ############
 if len(sys.argv) < 2:
