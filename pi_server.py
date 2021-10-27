@@ -27,7 +27,15 @@ ax.set_ylim(-2**32/2, 2**32/2)
 ax.set_xlim(0, CHUNK)
 ax.set_facecolor("k")
 
-bars = axBars.bar(range(60), np.random.rand(60))
+BAR_COUNT = 22
+bars = axBars.bar(range(BAR_COUNT), np.random.rand(BAR_COUNT))
+axBars.set_ylim(0, 1)
+axBars.set_facecolor("k")
+blockMemory = [[] for x in range(BAR_COUNT)]
+
+# Frequency ranges
+blocks = [20, 50, 125, 250, 500, 1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000, 
+                        10000, 11000, 12000, 13000, 14000, 15000, 16000, 17000, 18000]
 
 fig.set_facecolor("k")
 fig.show()
@@ -44,7 +52,7 @@ tcpSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 tcpSocket.bind((IP, PORT))
 
 tcpSocket.listen()
-tcpSocket.settimeout(10) # seconds
+tcpSocket.settimeout(100) # seconds
 print("Listening on:", (IP, PORT))
 
 while True:
@@ -57,8 +65,7 @@ while True:
         if not data:
             break
         try:
-            dataInt = struct.unpack(str(CHUNK) + "i", data)
-            #connection.send(b"any")
+            dataInt = struct.unpack(str(CHUNK) + "i", data) # CHUNK number of ints = 3072
 
             # amplitude graph
             line.set_ydata(dataInt)
@@ -66,13 +73,29 @@ while True:
             # fast fourier transform log graph
             dataFFT = np.abs(np.fft.fft(dataInt))*2 / (CHUNK * 2**32) # CHUNK in length
 
-            # TODO: Try to divide the fft data into 60 blocks depending on frequency range
-            #       and use a bar diagram to simulate the led strip
-            #       3072 / 60 = 51.2 fft values per bar (average)
-            # TODO: no, this doesn't work because the first 50 values are like the first 80% of the spectrum
-            #       so the first bar is always going to be super high
-            #       this needs to be custom, or have som log increase thingy
-            fftBlocks = [sum(dataFFT[x*51:(x+1)*51]) for x in range(60)]
+            # Each value dataFFT[i] corresponds to 44100/3072 samples
+            # I only want to use i=1-1393, the rest of the values are >20kHz
+
+            fftBlocks = []
+
+            # Smooth out the transitions on the bars by remembering previous values
+            for i in range(len(blockMemory)):
+                if len(blockMemory[i]) == 2:
+                    blockMemory[i] = blockMemory[i][1:]
+            
+            for i in range(1, len(blocks)):
+                p = int(blocks[i-1] // 14.36)
+                k = int(blocks[i] // 14.36)
+                blockMemory[i-1].append(sum(dataFFT[p:k]))
+
+            # dataFFT[0] = 0-14.36 Hz
+            # dataFFT[1] = 14.36-28.72 Hz
+            # dataFFT[2] = 28.72-43.08 Hz
+            # + 14.36 always...
+            
+            for i in range(BAR_COUNT):
+                avg = sum(blockMemory[i]) / len(blockMemory[i])
+                fftBlocks.append(avg)
 
             for bar, block in zip(bars, fftBlocks):
                 bar.set_height(block)
