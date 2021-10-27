@@ -3,6 +3,7 @@
 
 import sys
 import os
+import time
 import socket
 import pyaudio
 import wave
@@ -38,8 +39,17 @@ except FileNotFoundError:
 IP = "127.0.0.1"
 PORT = 65432
 
+attempts = 10
 tcpSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-tcpSocket.connect((IP, PORT))
+
+while attempts:
+    try:
+        print(f"({10-attempts}) Attempting to connect...")
+        tcpSocket.connect((IP, PORT))
+        break
+    except ConnectionRefusedError:
+        attempts -= 1
+        time.sleep(2)
 ############ Sender ############
 
 ############ Play audio and stream data to pi ############
@@ -80,20 +90,27 @@ data = wf.readframes(CHUNK)
 # Yup, that checked out.
 # But... how do we know the loop won't run faster or slower than that?
 
-# send data to audio stream
-while len(data) > 0:
+try:
+    # send data to audio stream
+    while len(data) > 0:
 
-    # send the data before playing it...
-    tcpSocket.sendall(data)
+        # send the data before playing it...
+        tcpSocket.sendall(data)
 
-    # wait for a response before playing the data - hacky solution?
-    #tcpSocket.recv(256)
+        # wait for a response before playing the data - hacky solution?
+        #tcpSocket.recv(256)
 
-    # write frames to the audio stream to make sound
-    stream.write(data)
+        # write frames to the audio stream to make sound
+        stream.write(data)
 
-    # reads frames, maybe this one reads frames in the speed specified by samplerate?
-    data = wf.readframes(CHUNK)
+        # reads frames, maybe this one reads frames in the speed specified by samplerate?
+        data = wf.readframes(CHUNK)
+
+except KeyboardInterrupt:
+    print("Stopped playing...")
+
+except:
+    print("Server exited...")
 
 ############ Play audio and stream data to pi ############
 
