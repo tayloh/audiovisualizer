@@ -27,15 +27,26 @@ ax.set_ylim(-2**32/2, 2**32/2)
 ax.set_xlim(0, CHUNK)
 ax.set_facecolor("k")
 
-BAR_COUNT = 22
+# Frequency ranges
+blocks = [20, 50, 100, 150, 250, 500, 1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000, 
+                        10000, 11000, 12000, 13000, 14000, 15000, 16000, 17000, 18000]
+BAR_COUNT = len(blocks) - 1
+
+bassColor = [34/255, 52/255, 181/255, 1] # blue
+trebleColor = [181/255, 25/255, 28/255, 1] # red
+barColors = [
+    [
+    bassColor[0] + t*(trebleColor[0]-bassColor[0]) / BAR_COUNT, 
+    bassColor[1] + t*(trebleColor[1]-bassColor[1]) / BAR_COUNT, 
+    bassColor[2] + t*(trebleColor[2]-bassColor[2]) / BAR_COUNT, 
+    1
+    ] 
+    for t in range(BAR_COUNT)]
+
 bars = axBars.bar(range(BAR_COUNT), np.random.rand(BAR_COUNT))
 axBars.set_ylim(0, 1)
 axBars.set_facecolor("k")
 blockMemory = [[] for x in range(BAR_COUNT)]
-
-# Frequency ranges
-blocks = [20, 50, 125, 250, 500, 1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000, 
-                        10000, 11000, 12000, 13000, 14000, 15000, 16000, 17000, 18000]
 
 fig.set_facecolor("k")
 fig.show()
@@ -71,7 +82,7 @@ while True:
             line.set_ydata(dataInt)
 
             # fast fourier transform log graph
-            dataFFT = np.abs(np.fft.fft(dataInt))*2 / (CHUNK * 2**32) # CHUNK in length
+            dataFFT = np.abs(np.fft.fft(dataInt))*3 / (CHUNK * 2**32) # CHUNK in length
 
             # Each value dataFFT[i] corresponds to 44100/3072 samples
             # I only want to use i=1-1393, the rest of the values are >20kHz
@@ -97,8 +108,13 @@ while True:
                 avg = sum(blockMemory[i]) / len(blockMemory[i])
                 fftBlocks.append(avg)
 
-            for bar, block in zip(bars, fftBlocks):
+            #avgHeight = sum(fftBlocks) / len(fftBlocks)
+            for bar, block, i in zip(bars, fftBlocks, range(len(bars))):
                 bar.set_height(block)
+                if block > 0.45:
+                    bar.set_color([181/255, 25/255, 28/255, 1]) # red
+                else:
+                    bar.set_color(barColors[i])
 
             lineFFT.set_ydata(dataFFT)
 
