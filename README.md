@@ -12,3 +12,7 @@
 * cd into directory
 * start server: `python pi_server.py`
 * start playing a wave file using the client: `python audio_client.py pathtowavefile.wav` 
+* A seperate demo of just the audio visualizer is available as well: `python retrosunset.py relative-path-to-directory-with-wav-files`
+* E.g. `python retrosunset.py ../wavmusic`
+
+* (The file audio_demo.py can be ignored)
