@@ -5,6 +5,7 @@ import struct
 import numpy as np
 import matplotlib.pyplot as plt
 
+
 CHUNK = 3 * 1024 # this had to be fine tuned to work with: gui update delay - stream delay - music playing
 
 ############ Visuals ############ (temp, TODO: led strip)
@@ -27,19 +28,21 @@ ax.set_ylim(-2**32/2, 2**32/2)
 ax.set_xlim(0, CHUNK)
 ax.set_facecolor("k")
 
+
 # Frequency ranges
 blocks = [20, 50, 100, 150, 250, 500, 1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000, 
-                        10000, 11000, 12000, 13000, 14000, 15000, 16000, 17000, 18000]
+                            10000, 11000, 12000, 13000, 14000, 15000, 16000, 17000, 18000]
+
 BAR_COUNT = len(blocks) - 1
 
-bassColor = [34/255, 52/255, 181/255, 1] # blue
-trebleColor = [181/255, 25/255, 28/255, 1] # red
+bassColor = [34/255, 52/255, 181/255, 0.5] # blue
+trebleColor = [181/255, 25/255, 28/255, 0.5] # red
 barColors = [
     [
     bassColor[0] + t*(trebleColor[0]-bassColor[0]) / BAR_COUNT, 
     bassColor[1] + t*(trebleColor[1]-bassColor[1]) / BAR_COUNT, 
     bassColor[2] + t*(trebleColor[2]-bassColor[2]) / BAR_COUNT, 
-    1
+    0.5
     ] 
     for t in range(BAR_COUNT)]
 
@@ -105,16 +108,22 @@ while True:
             # + 14.36 always...
             
             for i in range(BAR_COUNT):
-                avg = sum(blockMemory[i]) / len(blockMemory[i])
+                avg = 0
+                if len(blockMemory[i]) == 2:
+                    avg = blockMemory[i][0] * 0.65 + blockMemory[i][1] * 0.35
+                else: 
+                    avg = sum(blockMemory[i]) / len(blockMemory[i])
                 fftBlocks.append(avg)
 
             #avgHeight = sum(fftBlocks) / len(fftBlocks)
             for bar, block, i in zip(bars, fftBlocks, range(len(bars))):
                 bar.set_height(block)
                 if block > 0.45:
-                    bar.set_color([181/255, 25/255, 28/255, 1]) # red
+                    bar.set_color(barColors[i]) # red 181/255, 25/255, 28/255
+                    bar.set_alpha(1)
                 else:
                     bar.set_color(barColors[i])
+                    bar.set_alpha(0.5)
 
             lineFFT.set_ydata(dataFFT)
 
