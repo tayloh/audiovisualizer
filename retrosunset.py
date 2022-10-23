@@ -15,6 +15,23 @@ def rgb_to_hex(rgb):
     """
     return "#%02x%02x%02x" % rgb 
 
+def computeSignalEnergy(signal, mode="all"):
+    if mode == "all":
+        return sum(signal) / len(signal)
+    if mode == "bass":
+        # approx 0-100 Hz
+        return sum(signal[1:6]) / len(signal[1:6])
+
+def computeVariance(avg, data):
+    denom = len(data) if len(data) > 0 else 1
+    return sum([(x - avg)**2 for x in data]) / denom
+
+def easingFunction(x):
+    if x < 0.5:
+        return 4*x**3
+    else:
+        return (x-1)*(2*x-2)**2 + 1
+
 class NonBlockingAudioVisualizer:
     """
     Audio playback and visualizer on a separate thread.
@@ -38,6 +55,12 @@ class NonBlockingAudioVisualizer:
         self.visualizer_thread = None
         self.visualizer_data = [] # dont acces this, it might be under construction
         self.visualizer_data_last = []
+
+        self.energy_history_length = 64
+        self.beat = 0
+        self.beat_persistence = 60/160
+        self.beat_std = 1.1
+        self.time_last_beat = time.time()
 
         if not frequency_blocks:
             self.frequency_blocks = [
@@ -65,6 +88,9 @@ class NonBlockingAudioVisualizer:
         """
         return self.visualizer_data_last
     
+    def get_beat(self):
+        return self.beat
+
     def play_next(self):
         """Plays the next song in the queue and computes visualization.
         """
@@ -114,7 +140,8 @@ class NonBlockingAudioVisualizer:
         """Adds a song to the queue (via relative file path).
         """
         self.song_queue.put(filepath)
-    
+
+
     def _visualizer(self):
         """Internal method. Does audio playback and computes audio visualization data.
         """
@@ -124,6 +151,8 @@ class NonBlockingAudioVisualizer:
         chunk_size = NonBlockingAudioVisualizer.CHUNK_SIZE
         audio_data = self.wavefile.readframes(chunk_size)
         block_memory = [[] for x in range(self.bar_count)]
+
+        E_history = np.zeros(self.energy_history_length)
 
         while len(audio_data) > 0 and not self.skip:
             self.stream.write(audio_data)
@@ -165,6 +194,22 @@ class NonBlockingAudioVisualizer:
                 )
             self.visualizer_data_last = self.visualizer_data
             self.visualizer_data = []
+
+            E = computeSignalEnergy(data_fft, mode="bass")
+            E_history = np.roll(E_history, 1)
+            E_history[0] = E
+            E_history_no_zeros = E_history[E_history != 0]
+            avg = np.average(E_history_no_zeros)
+            variance = computeVariance(avg, E_history_no_zeros)
+            std = np.sqrt(variance)
+            if E > avg + self.beat_std*std and (time.time() - self.time_last_beat) >= self.beat_persistence:
+                self.beat = 1
+                self.time_last_beat = time.time()
+            elif (time.time() - self.time_last_beat) < self.beat_persistence:
+                self.beat = easingFunction(1 - (time.time() - self.time_last_beat) / self.beat_persistence)
+            else:
+                self.beat = 0
+            
         
         self.is_playing = False
     
@@ -284,6 +329,10 @@ for i in range(num_gradient):
 
 # Create the audio visualizer
 # freq = [60, 120, 250, 500, 750, 1000, 2000, 3000, 4000, 5000, 6000, 18000]
+# freq = [20, 100, 150, 250, 400, 600, 800, 1000]
+#freqs = [20, 50, 100, 150, 250, 500, 1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000, 
+#                10000, 11000, 15000, 20000]
+#audio_visualizer = NonBlockingAudioVisualizer(frequency_blocks=freqs)
 audio_visualizer = NonBlockingAudioVisualizer()
 
 # Check music directory
@@ -339,6 +388,14 @@ canvas.pack(fill="both", expand=True)
 
 absolute_starting_time = time.time()
 
+def lerp(t, p0, p1):
+    p = [0, 0, 0]
+    p[0] = (1-t)*p0[0] + t*p1[0]
+    p[1] = (1-t)*p0[1] + t*p1[1]
+    p[2] = (1-t)*p0[2] + t*p1[2]
+    return (int(p[0]), int(p[1]), int(p[2]))
+
+
 # Draw loop
 while running:
     start = time.time()
@@ -350,12 +407,24 @@ while running:
     # TODO should not do this if im concerned with performance?
     canvas.delete("all")
 
+    beat_color_stop0 = [18, 0, 8]
+    beat_color_stop1 = [130/5, 4, 38] if random.random() < 0.5 else [181/5, 25/5, 28/5]
+    canvas.configure(background=rgb_to_hex(lerp(audio_visualizer.get_beat(), beat_color_stop0, beat_color_stop1)))
+
     # Draw flickering stars
     for x, y in stars:
         size = random.randint(1, 2)
-        canvas.create_oval(x-size, y-size, x+size, y+size, fill="#DDDDDD")
+        color = "#DDDDDD"
+        # beat = audio_visualizer.get_beat()
+        # if beat:
+        #     size = 2 + beat * 2 
+
+        canvas.create_oval(x-size, y-size, x+size, y+size, fill=color)
     
     # Draw the sun
+    # sun_size = SUN_RADIUS + audio_visualizer.get_beat() * SUN_RADIUS * 0.1
+    # canvas.create_oval(WIDTH/2 - sun_size, (HEIGHT-300)/2 - sun_size,
+    # WIDTH/2 + sun_size, (HEIGHT-300)/2 + sun_size, fill=rgb_to_hex((181, 25, 28)))
     canvas.create_oval(WIDTH/2 - SUN_RADIUS, (HEIGHT-300)/2 - SUN_RADIUS,
     WIDTH/2 + SUN_RADIUS, (HEIGHT-300)/2 + SUN_RADIUS, fill=rgb_to_hex((181, 25, 28)))
 

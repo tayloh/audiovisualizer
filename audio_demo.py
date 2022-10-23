@@ -67,7 +67,7 @@ ax.set_ylim(-2**32, 2**32)
 ax.set_xlim(0, CHUNK)
 ax.set_facecolor("k")
 
-fig.set_facecolor("k")
+#fig.set_facecolor("k")
 fig.show()
 
 nameOfFile = fileToPlay.split("/")[-1]
