@@ -56,7 +56,8 @@ class NonBlockingAudioVisualizer:
         self.visualizer_data = [] # dont acces this, it might be under construction
         self.visualizer_data_last = []
 
-        self.energy_history_length = 64
+        self.energy_history_length = 32
+        self.beat_mode = "bass"
         self.beat = 0
         self.beat_persistence = 60/160
         self.beat_std = 1.1
@@ -195,7 +196,7 @@ class NonBlockingAudioVisualizer:
             self.visualizer_data_last = self.visualizer_data
             self.visualizer_data = []
 
-            E = computeSignalEnergy(data_fft, mode="bass")
+            E = computeSignalEnergy(data_fft, mode=self.beat_mode)
             E_history = np.roll(E_history, 1)
             E_history[0] = E
             E_history_no_zeros = E_history[E_history != 0]
@@ -330,8 +331,8 @@ for i in range(num_gradient):
 # Create the audio visualizer
 # freq = [60, 120, 250, 500, 750, 1000, 2000, 3000, 4000, 5000, 6000, 18000]
 # freq = [20, 100, 150, 250, 400, 600, 800, 1000]
-#freqs = [20, 50, 100, 150, 250, 500, 1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000, 
-#                10000, 11000, 15000, 20000]
+#freqs = [20, 100, 250, 500, 1000, 2000, 4000, 8000, 16000]#, 6000, 7000, 8000, 9000, 
+                #10000, 11000, 15000, 20000]
 #audio_visualizer = NonBlockingAudioVisualizer(frequency_blocks=freqs)
 audio_visualizer = NonBlockingAudioVisualizer()
 

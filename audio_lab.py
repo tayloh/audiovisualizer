@@ -9,8 +9,9 @@ import os
 
 # FFT output explained: https://www.youtube.com/watch?v=3aOaUv3s8RY
 # Windowing: https://digitalsoundandmusic.com/2-3-10-windowing-the-fft/
+# https://ciphrd.com/2019/09/01/audio-analysis-for-advanced-music-visualization-pt-1/
 
-CHUNK_SIZE = 1024*2
+CHUNK_SIZE = 1024*2 # num samples
 NUM_RECTS = 128 #128
 
 def openWavfileFromArgs():
@@ -58,6 +59,10 @@ def computeSignalEnergy(signal, mode="all"):
         return sum(signal) / len(signal)
     if mode == "bass":
         return sum(signal[1:6]) / len(signal[1:6])
+    if mode == "mixed":
+        return (sum(signal[2:6]) + sum(signal[13:36])) / (len(signal[2:6]) + len(signal[13:36]))
+    if mode == "lowhat":
+        return sum(signal[13:36]) / len(signal[13:36])
 
 def computeVariance(avg, data):
     denom = len(data) if len(data) > 0 else 1
@@ -90,12 +95,13 @@ stream = p.open(format=FORMAT,
 raw_data = wf.readframes(CHUNK_SIZE)
 
 #fig, (beat_graph, energy_history, barplot) = plt.subplots(3)
+#fig, (beat_graph, energy_history, energy_lowhat) = plt.subplots(3)
 fig, (beat_graph, energy_history) = plt.subplots(2)
 
 # bars = barplot.bar(range(NUM_RECTS), numpy.random.rand(NUM_RECTS))
 # barplot.set_ylim(0, 1)
 
-energy_max_x = 64
+energy_max_x = 32
 line, = energy_history.plot(numpy.linspace(0, energy_max_x, energy_max_x), numpy.linspace(0.5, 0.5, energy_max_x), color="red")
 lineAvg, = energy_history.plot(numpy.linspace(0, energy_max_x, energy_max_x), numpy.linspace(0.5, 0.5, energy_max_x), color="green")
 lineC, = energy_history.plot(numpy.linspace(0, energy_max_x, energy_max_x), numpy.linspace(0.5, 0.5, energy_max_x), color="blue")
@@ -103,7 +109,13 @@ energy_history.set_ylim(0, 0.005)
 energy_history.set_xlim(0, energy_max_x)
 highest_seen_energy = 0
 
-beat_std = 1.05
+# line_lowhat, = energy_lowhat.plot(numpy.linspace(0, energy_max_x, energy_max_x), numpy.linspace(0.5, 0.5, energy_max_x), color="red")
+# lineAvg_lowhat, = energy_lowhat.plot(numpy.linspace(0, energy_max_x, energy_max_x), numpy.linspace(0.5, 0.5, energy_max_x), color="green")
+# lineC_lowhat, = energy_lowhat.plot(numpy.linspace(0, energy_max_x, energy_max_x), numpy.linspace(0.5, 0.5, energy_max_x), color="blue")
+# energy_lowhat.set_ylim(0, 0.02)
+# energy_lowhat.set_xlim(0, energy_max_x)
+
+beat_std = 1.2
 
 max_beat_persistence = 60 / 160
 beat_persistence = max_beat_persistence
@@ -122,6 +134,9 @@ E_History = numpy.zeros(energy_max_x)
 E_avg = 0
 step = 0
 
+#E_History_lowhat = numpy.zeros(energy_max_x)
+#E_avg_lowhat = 0
+
 while len(raw_data) > 0:
     stream.write(raw_data)
 
@@ -131,7 +146,8 @@ while len(raw_data) > 0:
 
         #normalized_v = fft_data / numpy.sqrt(numpy.sum(fft_data**2))
 
-        E = computeSignalEnergy(fft_data, mode="all")
+        E = computeSignalEnergy(fft_data, mode="bass")
+        #E_lowhat = computeSignalEnergy(fft_data, mode="lowhat")
 
         highest_seen_energy = max(E, highest_seen_energy)
         energy_history.set_ylim(0, highest_seen_energy*2)
@@ -139,20 +155,33 @@ while len(raw_data) > 0:
         E_History = numpy.roll(E_History, 1)
         E_History[0] = E
 
+        #E_History_lowhat = numpy.roll(E_History_lowhat, 1)
+        #E_History_lowhat[0] = E_lowhat
+
         E_history_no_zeros = E_History[E_History != 0]
+        #E_history_lowhat_no_zeros = E_History_lowhat[E_History_lowhat != 0]
 
         line.set_ydata(E_History)
+        #line_lowhat.set_ydata(E_History_lowhat)
         avg = numpy.average(E_history_no_zeros)
+        #avg_lowhat = numpy.average(E_history_lowhat_no_zeros)
 
         lineAvg.set_ydata(avg)
+        #lineAvg_lowhat.set_ydata(avg_lowhat)
 
         variance = computeVariance(avg, E_history_no_zeros)
+        #variance_lowhat = computeVariance(avg_lowhat, E_history_lowhat_no_zeros)
+
         std = numpy.sqrt(variance)
+        #std_lowhat = numpy.sqrt(variance_lowhat)
+
         lineC.set_ydata(avg + beat_std*std)
+        #lineC_lowhat.set_ydata(avg_lowhat + beat_std*std_lowhat)
         amps = getRectAmplitudes(NUM_RECTS, fft_data)
 
         beat_history = numpy.roll(beat_history, 1)
 
+        # or E_lowhat > avg_lowhat + beat_std*std_lowhat
         # Is a beat
         if E > avg + beat_std*std and (time.time() - time_last_beat) >= beat_persistence:
             #print((avg + std) / avg)
