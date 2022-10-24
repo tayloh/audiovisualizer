@@ -20,7 +20,7 @@ def computeSignalEnergy(signal, mode="all"):
         return sum(signal) / len(signal)
     if mode == "bass":
         # approx 0-100 Hz
-        return sum(signal[1:6]) / len(signal[1:6])
+        return sum(signal[2:6]) / len(signal[2:6])
 
 def computeVariance(avg, data):
     denom = len(data) if len(data) > 0 else 1
@@ -163,7 +163,7 @@ class NonBlockingAudioVisualizer:
             except struct.error:
                 print("unpack error")
             
-            data_fft = np.abs(np.fft.fft(dataInt))*2 / (chunk_size * 2**32)
+            data_fft = np.abs(np.fft.fft(dataInt))*2.7 / (chunk_size * 2**32)
 
             fftBlocks = []
 
@@ -172,8 +172,8 @@ class NonBlockingAudioVisualizer:
                     block_memory[i] = block_memory[i][1:]
 
             for i in range(1, len(self.frequency_blocks)):
-                p = int(self.frequency_blocks[i-1] // magic)
-                k = int(self.frequency_blocks[i] // magic)
+                p = int(self.frequency_blocks[i-1] / magic + 0.5)
+                k = int(self.frequency_blocks[i] / magic + 0.5)
                 block_memory[i-1].append(sum(data_fft[p:k]))
 
             for i in range(self.bar_count):
@@ -183,7 +183,7 @@ class NonBlockingAudioVisualizer:
                 else: 
                     avg = sum(block_memory[i]) / len(block_memory[i])
                 fftBlocks.append(avg)
-
+            
             for bar, i in zip(fftBlocks, range(self.bar_count)):
                 color = (int(self.bar_colors[i][0]), int(self.bar_colors[i][1]), int(self.bar_colors[i][2]))
                 self.visualizer_data.append(
@@ -196,6 +196,8 @@ class NonBlockingAudioVisualizer:
             self.visualizer_data_last = self.visualizer_data
             self.visualizer_data = []
 
+
+            # Beat detection
             E = computeSignalEnergy(data_fft, mode=self.beat_mode)
             E_history = np.roll(E_history, 1)
             E_history[0] = E
@@ -203,7 +205,12 @@ class NonBlockingAudioVisualizer:
             avg = np.average(E_history_no_zeros)
             variance = computeVariance(avg, E_history_no_zeros)
             std = np.sqrt(variance)
-            if E > avg + self.beat_std*std and (time.time() - self.time_last_beat) >= self.beat_persistence:
+            threshold = -12*std + 1.55
+            threshold = max(threshold, 1.1)
+            cond_persistence = (time.time() - self.time_last_beat) >= self.beat_persistence
+            cond1 = E > avg + self.beat_std*std 
+            cond3 = cond3 = E > threshold * avg 
+            if cond1 and cond_persistence:
                 self.beat = 1
                 self.time_last_beat = time.time()
             elif (time.time() - self.time_last_beat) < self.beat_persistence:
@@ -333,6 +340,8 @@ for i in range(num_gradient):
 # freq = [20, 100, 150, 250, 400, 600, 800, 1000]
 #freqs = [20, 100, 250, 500, 1000, 2000, 4000, 8000, 16000]#, 6000, 7000, 8000, 9000, 
                 #10000, 11000, 15000, 20000]
+#freqs = [30, 70, 170, 310, 600, 1000, 3000, 6000, 12000, 14000, 16000] winamp
+#freqs = [0, 60*1, 60*2, 60*4, 60*8, 60*16, 60*32, 60*64, 60*128, 60*256]
 #audio_visualizer = NonBlockingAudioVisualizer(frequency_blocks=freqs)
 audio_visualizer = NonBlockingAudioVisualizer()
 

@@ -58,7 +58,7 @@ def computeSignalEnergy(signal, mode="all"):
     if mode == "all":
         return sum(signal) / len(signal)
     if mode == "bass":
-        return sum(signal[1:6]) / len(signal[1:6])
+        return sum(signal[2:6]) / len(signal[2:6])
     if mode == "mixed":
         return (sum(signal[2:6]) + sum(signal[13:36])) / (len(signal[2:6]) + len(signal[13:36]))
     if mode == "lowhat":
@@ -115,7 +115,7 @@ highest_seen_energy = 0
 # energy_lowhat.set_ylim(0, 0.02)
 # energy_lowhat.set_xlim(0, energy_max_x)
 
-beat_std = 1.2
+beat_std = 1.05
 
 max_beat_persistence = 60 / 160
 beat_persistence = max_beat_persistence
@@ -141,9 +141,9 @@ while len(raw_data) > 0:
     stream.write(raw_data)
 
     try:
-        amplitude_data_ints = struct.unpack(str(CHUNK_SIZE) + "i", raw_data)
+        amplitude_data_ints = numpy.array(struct.unpack(str(CHUNK_SIZE) + "i", raw_data))
         fft_data = numpy.abs(numpy.fft.fft(amplitude_data_ints)) / ((CHUNK_SIZE)*2**32)
-
+        #fft_data = fft_data / max(fft_data))
         #normalized_v = fft_data / numpy.sqrt(numpy.sum(fft_data**2))
 
         E = computeSignalEnergy(fft_data, mode="bass")
@@ -176,6 +176,12 @@ while len(raw_data) > 0:
         #std_lowhat = numpy.sqrt(variance_lowhat)
 
         lineC.set_ydata(avg + beat_std*std)
+        threshold = -12*std + 1.55
+        threshold = max(threshold, 1.1)
+        #lineC.set_ydata(threshold * avg)
+        #print(threshold)
+        #print(variance)
+        #print(avg, avg+0.5*avg)
         #lineC_lowhat.set_ydata(avg_lowhat + beat_std*std_lowhat)
         amps = getRectAmplitudes(NUM_RECTS, fft_data)
 
@@ -183,7 +189,10 @@ while len(raw_data) > 0:
 
         # or E_lowhat > avg_lowhat + beat_std*std_lowhat
         # Is a beat
-        if E > avg + beat_std*std and (time.time() - time_last_beat) >= beat_persistence:
+        cond1 = E > avg + beat_std*std 
+        cond3 = E > threshold * avg
+        cond_persistence = (time.time() - time_last_beat) >= beat_persistence
+        if cond1 and cond_persistence:
             #print((avg + std) / avg)
             time_last_beat = time.time()
             beat_history[0] = 1
