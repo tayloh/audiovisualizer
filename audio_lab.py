@@ -84,6 +84,8 @@ FORMAT = p.get_format_from_width(wf.getsampwidth())
 CHANNELS = wf.getnchannels()
 SAMPLERATE = wf.getframerate()
 
+width = wf.getsampwidth()
+print(p.get_format_from_width(width))
 
 # open a stream and set values that we got from wav header
 stream = p.open(format=FORMAT,

@@ -45,13 +45,14 @@ class NonBlockingAudioVisualizer:
     # number of frequencies represented by each datapoint from the FFT result
     # since the frequency band is 0-44100, magic number is how many
     # frequencies each band will have
-    MAGIC_NUMBER = 44100 / CHUNK_SIZE 
+    #MAGIC_NUMBER = 44100 / CHUNK_SIZE 
 
     def __init__(self, frequency_blocks = [], bass_color = [150, 52, 181], treble_color = [181, 25, 28]):
         """Returns a NonBlockingAudioVisualizer object.
         """
         self.song_queue = queue.Queue()
 
+        self.freqs_per_bin = 0
         self.visualizer_thread = None
         self.visualizer_data = [] # dont acces this, it might be under construction
         self.visualizer_data_last = []
@@ -63,7 +64,7 @@ class NonBlockingAudioVisualizer:
         self.beat_std = 1.1
         self.time_last_beat = time.time()
 
-        if not frequency_blocks:
+        if len(frequency_blocks) == 0:
             self.frequency_blocks = [
                 20, 50, 100, 150, 250, 500, 1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000, 
                 10000, 11000, 12000, 13000, 14000, 15000, 16000, 17000, 18000]
@@ -115,6 +116,8 @@ class NonBlockingAudioVisualizer:
         self.channels = self.wavefile.getnchannels()
         self.samplerate = self.wavefile.getframerate()
 
+        self.freqs_per_bin = self.samplerate / NonBlockingAudioVisualizer.CHUNK_SIZE
+
         self.stream = self.audio.open(
             format=self.format,
             channels=self.channels,
@@ -146,7 +149,8 @@ class NonBlockingAudioVisualizer:
     def _visualizer(self):
         """Internal method. Does audio playback and computes audio visualization data.
         """
-        magic = NonBlockingAudioVisualizer.MAGIC_NUMBER
+        #magic = NonBlockingAudioVisualizer.MAGIC_NUMBER
+        magic = self.freqs_per_bin
         self.is_playing = True
 
         chunk_size = NonBlockingAudioVisualizer.CHUNK_SIZE
@@ -154,45 +158,97 @@ class NonBlockingAudioVisualizer:
         block_memory = [[] for x in range(self.bar_count)]
 
         E_history = np.zeros(self.energy_history_length)
+        fft_window = np.hanning(chunk_size)
+        visualizer_buffer = np.zeros(self.bar_count)
 
         while len(audio_data) > 0 and not self.skip:
             self.stream.write(audio_data)
             audio_data = self.wavefile.readframes(chunk_size)
             try:
                 dataInt = struct.unpack(str(chunk_size) + "i", audio_data)
+                dataInt = fft_window * dataInt
             except struct.error:
                 print("unpack error")
+                self.is_playing = False
+                self.skip = True
+                break
             
-            data_fft = np.abs(np.fft.fft(dataInt))*2.7 / (chunk_size * 2**32)
+            #data_fft = np.abs(np.fft.fft(dataInt))*2.7 / (chunk_size * 2**32)
+            data_fft = np.abs(np.fft.rfft(dataInt)[1:])*2 / (chunk_size * 2**30)
+            
+            fft_bins_before_mirror = 1024
+            log2test = np.logspace(0, np.log2(np.log2(self.samplerate / 2)), fft_bins_before_mirror, base=2)
+            log2test2 = np.logspace(0, np.log2(self.samplerate / 2), fft_bins_before_mirror, base=2)
+            logMassiveTest = np.logspace(0, np.log10(self.samplerate / 2), fft_bins_before_mirror)
+            #data_fft = 2**(log2test) * data_fft # note that bass gets mult by 2 now and not 1
+            data_fft = log2test2 * data_fft
 
             fftBlocks = []
 
             for i in range(len(block_memory)):
-                if len(block_memory[i]) == 2:
+                if len(block_memory[i]) == 1:
                     block_memory[i] = block_memory[i][1:]
 
             for i in range(1, len(self.frequency_blocks)):
-                p = int(self.frequency_blocks[i-1] / magic + 0.5)
-                k = int(self.frequency_blocks[i] / magic + 0.5)
-                block_memory[i-1].append(sum(data_fft[p:k]))
+                p = int(self.frequency_blocks[i-1] / magic)
+                k = int(self.frequency_blocks[i] / magic)
+                block_memory[i-1].append(sum(data_fft[p:k]) / (k-p))
 
             for i in range(self.bar_count):
                 avg = 0
-                if len(block_memory[i]) == 2:
-                    avg = block_memory[i][0] * 0.65 + block_memory[i][1] * 0.35
+                if len(block_memory[i]) == 1:
+                    #avg = block_memory[i][1] * 0.75 + block_memory[i][0] * 0.25
+                    avg = block_memory[i][0]
+                    
                 else: 
                     avg = sum(block_memory[i]) / len(block_memory[i])
+                    
                 fftBlocks.append(avg)
             
-            for bar, i in zip(fftBlocks, range(self.bar_count)):
+            # # average normalization 
+            # TODO normalize according to individual bin running
+            # energy averages instead probably
+            fftBlocks = np.array(fftBlocks)
+            size_of_avg = 0.5
+            avg_buffer_energy = np.average(fftBlocks)
+            multipliers = size_of_avg * fftBlocks / avg_buffer_energy
+            fftBlocks = multipliers * fftBlocks
+            #fftBlocks = np.multiply(2, np.array(fftBlocks))
+
+            # gaus filter (remove maybe)
+            gaus_kernel = np.array([0.0002,	0.0060,	0.0606,	0.2417,	0.3829,	0.2417,	0.0606,	0.0060,	0.0002])
+            fftBlocks = np.convolve(fftBlocks, gaus_kernel)
+            
+            for i in range(len(fftBlocks)):
+                # convolving changes th shape of fftBlocks
+                if i >= len(fftBlocks) or i >= len(visualizer_buffer):
+                    break
+                if (fftBlocks[i] > visualizer_buffer[i]):
+                    visualizer_buffer[i] = fftBlocks[i]
+                else:
+                    #buffer_decrease[i] = (band_buffer[i] - fft_rect_bin_avg[i]) / 4
+                    #buffer_decrease[i] = band_buffer[i] / 8
+                    visualizer_buffer[i] -= visualizer_buffer[i]/8
+            
+            # gaus filter waves!!! lol, any other filters to try?
+            # gaus_kernel = np.array([0.0002,	0.0060,	0.0606,	0.2417,	0.3829,	0.2417,	0.0606,	0.0060,	0.0002])
+            # visualizer_buffer = np.convolve(visualizer_buffer, gaus_kernel)
+
+            # zip(fftBlocks, range(self.bar_count))
+            for bar, i in zip(visualizer_buffer, range(self.bar_count)):
                 color = (int(self.bar_colors[i][0]), int(self.bar_colors[i][1]), int(self.bar_colors[i][2]))
+                bar_height = (bar*720/4)**1.25
+                #bar_height = (bar*720/4)
+                #bar_height = (bar*2*720/2)
+                
                 self.visualizer_data.append(
                     ( 
                 150 + i*900/self.bar_count, 720/2 + 45, 
-                150 + i*900/self.bar_count+900/self.bar_count, 720/2 + 45 - bar*720/4,
+                150 + i*900/self.bar_count+900/self.bar_count, 720/2 + 45 - bar_height,
                 rgb_to_hex(color)
                     )
                 )
+            
             self.visualizer_data_last = self.visualizer_data
             self.visualizer_data = []
 
@@ -202,7 +258,7 @@ class NonBlockingAudioVisualizer:
             E_history = np.roll(E_history, 1)
             E_history[0] = E
             E_history_no_zeros = E_history[E_history != 0]
-            avg = np.average(E_history_no_zeros)
+            avg = 0 if len(E_history_no_zeros) == 0 else np.average(E_history_no_zeros)
             variance = computeVariance(avg, E_history_no_zeros)
             std = np.sqrt(variance)
             threshold = -12*std + 1.55
@@ -342,8 +398,15 @@ for i in range(num_gradient):
                 #10000, 11000, 15000, 20000]
 #freqs = [30, 70, 170, 310, 600, 1000, 3000, 6000, 12000, 14000, 16000] winamp
 #freqs = [0, 60*1, 60*2, 60*4, 60*8, 60*16, 60*32, 60*64, 60*128, 60*256]
-#audio_visualizer = NonBlockingAudioVisualizer(frequency_blocks=freqs)
-audio_visualizer = NonBlockingAudioVisualizer()
+
+#freqs = np.linspace(0, 16000, 50)
+#freqs = np.logspace(np.log10(20), np.log10(16000), 50)
+#freqs = [0, 20, 40, 80, 160, 320, 640, 1280, 2560, 5120, 10240]
+#freqs = [0, 20, 120, 220, 300, 400, 500, 600, 700, 800, 1000, 1500, 2000, 2500, 3000, 4000, 5000, 6000]
+frequencies = [25*x for x in range(160)] #0-3450
+#frequencies += [3500 + 100*x for x in range(70)] #3500-10450
+audio_visualizer = NonBlockingAudioVisualizer(frequency_blocks=frequencies)
+#audio_visualizer = NonBlockingAudioVisualizer()
 
 # Check music directory
 if len(sys.argv) < 2:
@@ -405,6 +468,7 @@ def lerp(t, p0, p1):
     p[2] = (1-t)*p0[2] + t*p1[2]
     return (int(p[0]), int(p[1]), int(p[2]))
 
+threshold_vis_rects = [0 for x in range(len(frequencies)-1)]
 
 # Draw loop
 while running:
@@ -469,16 +533,21 @@ while running:
             line.z0 = LINE_ZPOS
             line.z1 = LINE_ZPOS
 
+    # idea: track avg last 10 or so frames
+    # if higher than avg, quickly, smoothly, go down until below avg, then take new value
     # Draw the visualizer data
     visualizer_rects = audio_visualizer.get_last_visualizer_data()
 
     for x0, y0, x1, y1, color in visualizer_rects:
+        # is height of new rect is larger, draw it, else smoothly decrease
         canvas.create_rectangle(x0, y0+1, x1, y1+1, fill=color, outline=color)
-    
+        
+
     # Update and measure frame time
     canvas.update()
     
-    time.sleep(1/1000)
+    #time.sleep(1/1000)
     
     end = time.time()
     dt = end - start
+    #print("%s fps" % (1/dt))

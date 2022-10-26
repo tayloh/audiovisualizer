@@ -37,7 +37,7 @@ except FileNotFoundError:
 p = pyaudio.PyAudio()
 
 # get values from wav header
-CHUNK = 1024 * 3 # had to increase chunk size or it started to lag
+CHUNK = 1024 * 2 # had to increase chunk size or it started to lag
 FORMAT = p.get_format_from_width(wf.getsampwidth())
 CHANNELS = wf.getnchannels()
 SAMPLERATE = wf.getframerate()
@@ -51,23 +51,23 @@ stream = p.open(format=FORMAT,
 
 
 # visuals
-fig, (ax, axFFT) = plt.subplots(2)
+fig, (ax, axFFT) = plt.subplots(2, figsize=(8, 5))
 
 # fft stuff
 xFFT = numpy.linspace(0, SAMPLERATE, CHUNK)
-lineFFT, = axFFT.semilogx(xFFT, numpy.random.rand(CHUNK), "tab:purple")
+lineFFT, = axFFT.semilogx(xFFT, numpy.random.rand(CHUNK), "tab:purple") #tab:purple
 axFFT.set_ylim(0, 1)
 axFFT.set_xlim(20, SAMPLERATE/2)
 axFFT.set_facecolor("k")
 
 # just initiate the plot with CHUNK nr om random y values, will update in while loop
-x = numpy.arange(0, 2*CHUNK, 2)
+x = numpy.arange(0, CHUNK)
 line, = ax.plot(x, numpy.random.rand(CHUNK), "g")
-ax.set_ylim(-2**32, 2**32)
+ax.set_ylim(-2**31, 2**31)
 ax.set_xlim(0, CHUNK)
 ax.set_facecolor("k")
 
-#fig.set_facecolor("k")
+fig.set_facecolor("k")
 fig.show()
 
 nameOfFile = fileToPlay.split("/")[-1]
@@ -94,6 +94,9 @@ unpack_errors = 0
 # But... how do we know the loop won't run faster or slower than that?
 loopCount = 0
 # send data to audio stream
+
+fig.canvas.draw()
+
 while len(data) > 0:
 
     # write frames to the audio stream to make sound
@@ -108,7 +111,6 @@ while len(data) > 0:
 
         # amplitude graph
         line.set_ydata(dataInt)
-
         # fast fourier transform log graph
         lineFFT.set_ydata(numpy.abs(numpy.fft.fft(dataInt))*2 / (CHUNK * 2**32))
     except struct.error as e:
