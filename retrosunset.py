@@ -161,6 +161,9 @@ class NonBlockingAudioVisualizer:
         fft_window = np.hanning(chunk_size)
         visualizer_buffer = np.zeros(self.bar_count)
 
+        bin_energy_history = [[] for x in range(self.bar_count)]
+        history_length = 32
+
         while len(audio_data) > 0 and not self.skip:
             self.stream.write(audio_data)
             audio_data = self.wavefile.readframes(chunk_size)
@@ -181,7 +184,7 @@ class NonBlockingAudioVisualizer:
             log2test2 = np.logspace(0, np.log2(self.samplerate / 2), fft_bins_before_mirror, base=2)
             logMassiveTest = np.logspace(0, np.log10(self.samplerate / 2), fft_bins_before_mirror)
             #data_fft = 2**(log2test) * data_fft # note that bass gets mult by 2 now and not 1
-            data_fft = log2test2 * data_fft
+            data_fft = log2test * data_fft
 
             fftBlocks = []
 
@@ -193,6 +196,7 @@ class NonBlockingAudioVisualizer:
                 p = int(self.frequency_blocks[i-1] / magic)
                 k = int(self.frequency_blocks[i] / magic)
                 block_memory[i-1].append(sum(data_fft[p:k]) / (k-p))
+                
 
             for i in range(self.bar_count):
                 avg = 0
@@ -208,12 +212,35 @@ class NonBlockingAudioVisualizer:
             # # average normalization 
             # TODO normalize according to individual bin running
             # energy averages instead probably
-            fftBlocks = np.array(fftBlocks)
-            size_of_avg = 0.5
-            avg_buffer_energy = np.average(fftBlocks)
-            multipliers = size_of_avg * fftBlocks / avg_buffer_energy
-            fftBlocks = multipliers * fftBlocks
+            # fftBlocks = np.array(fftBlocks)
+            size_of_avg = 1
+            # avg_buffer_energy = np.average(fftBlocks)
+            # multipliers = size_of_avg * fftBlocks / avg_buffer_energy
+            # fftBlocks = multipliers * fftBlocks
             #fftBlocks = np.multiply(2, np.array(fftBlocks))
+
+            # normalization with avg temporal energy of individual bins
+            for i in range(len(bin_energy_history)):
+                
+                # update energy histories for each bin
+                if (len(bin_energy_history[i])) > history_length - 1:
+                    bin_energy_history[i] = bin_energy_history[i][1:].append(fftBlocks[i])
+                
+                # normalize to avg for each bin
+                curr_bin_avg = sum(bin_energy_history[i]) / history_length
+                if curr_bin_avg == 0:
+                    curr_bin_avg = 0.1
+                
+                multiplier = (fftBlocks[i] / curr_bin_avg)
+
+                def block_result(mult, avg_height):
+                    #return mult * size_of_avg
+                    truncated_mult = mult if mult < 3 else mult - mult/3
+                    result = truncated_mult * avg_height
+                    return result
+                
+                fftBlocks[i] = block_result(multiplier, size_of_avg)
+                #fftBlocks[i] = 2 * multiplier * size_of_avg if multiplier > 1.2 else multiplier * size_of_avg
 
             # gaus filter (remove maybe)
             gaus_kernel = np.array([0.0002,	0.0060,	0.0606,	0.2417,	0.3829,	0.2417,	0.0606,	0.0060,	0.0002])
@@ -237,8 +264,8 @@ class NonBlockingAudioVisualizer:
             # zip(fftBlocks, range(self.bar_count))
             for bar, i in zip(visualizer_buffer, range(self.bar_count)):
                 color = (int(self.bar_colors[i][0]), int(self.bar_colors[i][1]), int(self.bar_colors[i][2]))
-                bar_height = (bar*720/4)**1.25
-                #bar_height = (bar*720/4)
+                #bar_height = (bar*720/4)**1.25
+                bar_height = (bar*720/4)
                 #bar_height = (bar*2*720/2)
                 
                 self.visualizer_data.append(
@@ -404,6 +431,7 @@ for i in range(num_gradient):
 #freqs = [0, 20, 40, 80, 160, 320, 640, 1280, 2560, 5120, 10240]
 #freqs = [0, 20, 120, 220, 300, 400, 500, 600, 700, 800, 1000, 1500, 2000, 2500, 3000, 4000, 5000, 6000]
 frequencies = [25*x for x in range(160)] #0-3450
+#frequencies = [25*x for x in range(2*180)] 
 #frequencies += [3500 + 100*x for x in range(70)] #3500-10450
 audio_visualizer = NonBlockingAudioVisualizer(frequency_blocks=frequencies)
 #audio_visualizer = NonBlockingAudioVisualizer()
