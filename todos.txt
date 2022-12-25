@@ -1,0 +1,6 @@
+maybe:
+* gaussian smoothing in the temporal domain for each bin
+* semilog "plot" of bins, then in riemann fashion reconstruct the rectangles
+* gaussian smoothing over larger areas of bin space?
+
+https://www.audiolabs-erlangen.de/resources/MIR/FMP/C3/C3S1_FeatureSmoothing.html

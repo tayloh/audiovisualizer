@@ -145,7 +145,6 @@ class NonBlockingAudioVisualizer:
         """
         self.song_queue.put(filepath)
 
-
     def _visualizer(self):
         """Internal method. Does audio playback and computes audio visualization data.
         """
@@ -189,7 +188,7 @@ class NonBlockingAudioVisualizer:
             fftBlocks = []
 
             for i in range(len(block_memory)):
-                if len(block_memory[i]) == 1:
+                if len(block_memory[i]) == 4:
                     block_memory[i] = block_memory[i][1:]
 
             for i in range(1, len(self.frequency_blocks)):
@@ -203,7 +202,10 @@ class NonBlockingAudioVisualizer:
                 if len(block_memory[i]) == 1:
                     #avg = block_memory[i][1] * 0.75 + block_memory[i][0] * 0.25
                     avg = block_memory[i][0]
-                    
+                
+                elif len(block_memory[i]) == 4:
+                    avg = block_memory[i][2] * 0.6 + block_memory[i][1] * 0.2 + block_memory[i][2] * 0.1 + block_memory[i][3] * 0.1
+
                 else: 
                     avg = sum(block_memory[i]) / len(block_memory[i])
                     
@@ -223,7 +225,7 @@ class NonBlockingAudioVisualizer:
             for i in range(len(bin_energy_history)):
                 
                 # update energy histories for each bin
-                if (len(bin_energy_history[i])) > history_length - 1:
+                if (len(bin_energy_history[i])) == history_length:
                     bin_energy_history[i] = bin_energy_history[i][1:].append(fftBlocks[i])
                 
                 # normalize to avg for each bin
@@ -244,7 +246,8 @@ class NonBlockingAudioVisualizer:
 
             # gaus filter (remove maybe)
             gaus_kernel = np.array([0.0002,	0.0060,	0.0606,	0.2417,	0.3829,	0.2417,	0.0606,	0.0060,	0.0002])
-            fftBlocks = np.convolve(fftBlocks, gaus_kernel)
+            gaus_kernel_small = np.array([0.05, 0.2, 0.5, 0.2, 0.05])
+            #fftBlocks = np.convolve(fftBlocks, gaus_kernel_small)
             
             for i in range(len(fftBlocks)):
                 # convolving changes th shape of fftBlocks
@@ -267,11 +270,16 @@ class NonBlockingAudioVisualizer:
                 #bar_height = (bar*720/4)**1.25
                 bar_height = (bar*720/4)
                 #bar_height = (bar*2*720/2)
-                
+
+                bar_width = 900/self.bar_count
+                bass_width = bar_width * 8
+                # TODO: Logaritmhic falloff in bar sizes
+                # but, looks very blocky without bezier curve fit
+
                 self.visualizer_data.append(
                     ( 
                 150 + i*900/self.bar_count, 720/2 + 45, 
-                150 + i*900/self.bar_count+900/self.bar_count, 720/2 + 45 - bar_height,
+                150 + i*900/self.bar_count+bar_width, 720/2 + 45 - bar_height,
                 rgb_to_hex(color)
                     )
                 )
@@ -433,6 +441,7 @@ for i in range(num_gradient):
 frequencies = [25*x for x in range(160)] #0-3450
 #frequencies = [25*x for x in range(2*180)] 
 #frequencies += [3500 + 100*x for x in range(70)] #3500-10450
+#frequencies = [50*x for x in range(160)]
 audio_visualizer = NonBlockingAudioVisualizer(frequency_blocks=frequencies)
 #audio_visualizer = NonBlockingAudioVisualizer()
 
@@ -567,9 +576,10 @@ while running:
     visualizer_rects = audio_visualizer.get_last_visualizer_data()
 
     for x0, y0, x1, y1, color in visualizer_rects:
-        # is height of new rect is larger, draw it, else smoothly decrease
+        #TODO: Since FPS is higher than visualization rate, interpolate the positions in between
+
         canvas.create_rectangle(x0, y0+1, x1, y1+1, fill=color, outline=color)
-        
+
 
     # Update and measure frame time
     canvas.update()
