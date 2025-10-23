@@ -112,7 +112,7 @@ fig, ax = plt.subplots(1, figsize=(15, 7))
 
 x = numpy.linspace(0, SAMPLE_RATE / 2, num_rect_bins)
 #line, = ax.plot(x, numpy.random.rand(num_rect_bins), '-', lw=2)
-line, = ax.semilogx(x, numpy.random.rand(num_rect_bins), '-', lw=2, basex=2)
+line, = ax.semilogx(x, numpy.random.rand(num_rect_bins), '-', lw=2, base=2)
 #ax.set_xlim(0, 18000)
 #ax.set_xlim(20, 16000) # SAMPLE_RATE / 2
 ax.set_ylim(0, 1)

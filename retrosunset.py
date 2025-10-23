@@ -161,7 +161,7 @@ class NonBlockingAudioVisualizer:
         visualizer_buffer = np.zeros(self.bar_count)
 
         bin_energy_history = [[] for x in range(self.bar_count)]
-        history_length = 32
+        history_length = 64*2 # 32
 
         while len(audio_data) > 0 and not self.skip:
             self.stream.write(audio_data)
@@ -178,7 +178,7 @@ class NonBlockingAudioVisualizer:
             #data_fft = np.abs(np.fft.fft(dataInt))*2.7 / (chunk_size * 2**32)
             data_fft = np.abs(np.fft.rfft(dataInt)[1:])*2 / (chunk_size * 2**30)
             
-            fft_bins_before_mirror = 1024
+            fft_bins_before_mirror = int(NonBlockingAudioVisualizer.CHUNK_SIZE / 2)
             log2test = np.logspace(0, np.log2(np.log2(self.samplerate / 2)), fft_bins_before_mirror, base=2)
             log2test2 = np.logspace(0, np.log2(self.samplerate / 2), fft_bins_before_mirror, base=2)
             logMassiveTest = np.logspace(0, np.log10(self.samplerate / 2), fft_bins_before_mirror)
@@ -194,6 +194,7 @@ class NonBlockingAudioVisualizer:
             for i in range(1, len(self.frequency_blocks)):
                 p = int(self.frequency_blocks[i-1] / magic)
                 k = int(self.frequency_blocks[i] / magic)
+
                 block_memory[i-1].append(sum(data_fft[p:k]) / (k-p))
                 
 
@@ -211,38 +212,52 @@ class NonBlockingAudioVisualizer:
                     
                 fftBlocks.append(avg)
             
-            # # average normalization 
-            # TODO normalize according to individual bin running
-            # energy averages instead probably
-            # fftBlocks = np.array(fftBlocks)
-            size_of_avg = 1
-            # avg_buffer_energy = np.average(fftBlocks)
-            # multipliers = size_of_avg * fftBlocks / avg_buffer_energy
-            # fftBlocks = multipliers * fftBlocks
-            #fftBlocks = np.multiply(2, np.array(fftBlocks))
+            # # # average normalization 
+            # # TODO normalize according to individual bin running
+            # # energy averages instead probably
+            # # fftBlocks = np.array(fftBlocks)
+            # size_of_avg = 0.2 # 0.2
+            # # avg_buffer_energy = np.average(fftBlocks)
+            # # multipliers = size_of_avg * fftBlocks / avg_buffer_energy
+            # # fftBlocks = multipliers * fftBlocks
+            # #fftBlocks = np.multiply(2, np.array(fftBlocks))
+            # #print(len(bin_energy_history[1]))
+            # # normalization with avg temporal energy of individual bins
+            # for i in range(len(bin_energy_history)):
+                
+            #     # update energy histories for each bin
+            #     if (len(bin_energy_history[i])) == history_length:
+            #         bin_energy_history[i] = bin_energy_history[i][1:]
+            #         bin_energy_history[i].append(fftBlocks[i])
+                
+            #     # TODO: Above code never run, and it still worked great... what
+            #     # yeah it just became a multipler of 10 lol
+            #     else:
+            #         bin_energy_history[i].append(fftBlocks[i])
+                    
+                
+            #     # normalize to avg for each bin
+            #     curr_bin_avg = sum(bin_energy_history[i]) / history_length
+            #     if curr_bin_avg == 0:
+            #         curr_bin_avg = 0.1
+                
+            #     multiplier = (fftBlocks[i] / curr_bin_avg)
 
-            # normalization with avg temporal energy of individual bins
-            for i in range(len(bin_energy_history)):
+            #     def block_result(mult, avg_height):
+            #         #return mult * size_of_avg
+            #         truncated_mult = mult if mult < 3 else mult - mult/3
+            #         result = truncated_mult * avg_height
+            #         return result
                 
-                # update energy histories for each bin
-                if (len(bin_energy_history[i])) == history_length:
-                    bin_energy_history[i] = bin_energy_history[i][1:].append(fftBlocks[i])
-                
-                # normalize to avg for each bin
-                curr_bin_avg = sum(bin_energy_history[i]) / history_length
-                if curr_bin_avg == 0:
-                    curr_bin_avg = 0.1
-                
-                multiplier = (fftBlocks[i] / curr_bin_avg)
+                #fftBlocks[i] = block_result(multiplier, size_of_avg)
 
-                def block_result(mult, avg_height):
-                    #return mult * size_of_avg
-                    truncated_mult = mult if mult < 3 else mult - mult/3
-                    result = truncated_mult * avg_height
-                    return result
-                
-                fftBlocks[i] = block_result(multiplier, size_of_avg)
+                #fftBlocks[i] *= 10 # TODO: this is all that was happening lol, and I thought it was avg normalization
+                #fftBlocks[i] = size_of_avg * multiplier
                 #fftBlocks[i] = 2 * multiplier * size_of_avg if multiplier > 1.2 else multiplier * size_of_avg
+
+            # just lol....
+            for i in range(len(fftBlocks)):
+                fftBlocks[i] *= 9
 
             # gaus filter (remove maybe)
             gaus_kernel = np.array([0.0002,	0.0060,	0.0606,	0.2417,	0.3829,	0.2417,	0.0606,	0.0060,	0.0002])
@@ -300,7 +315,7 @@ class NonBlockingAudioVisualizer:
             threshold = max(threshold, 1.1)
             cond_persistence = (time.time() - self.time_last_beat) >= self.beat_persistence
             cond1 = E > avg + self.beat_std*std 
-            cond3 = cond3 = E > threshold * avg 
+            # cond3 = cond3 = E > threshold * avg 
             if cond1 and cond_persistence:
                 self.beat = 1
                 self.time_last_beat = time.time()
@@ -330,7 +345,7 @@ class Line3D:
     
     def get_projected_coordinates(self, focal_dist, canvas_dims):
         """Gets the projected coordinates of the 3D line onto the 2D canvas.
-        Using perspective(?) projection.
+        Using perspective projection.
         """
         width = canvas_dims[0]
         height = canvas_dims[1]
@@ -441,7 +456,7 @@ for i in range(num_gradient):
 frequencies = [25*x for x in range(160)] #0-3450
 #frequencies = [25*x for x in range(2*180)] 
 #frequencies += [3500 + 100*x for x in range(70)] #3500-10450
-#frequencies = [50*x for x in range(160)]
+#frequencies = [50*x for x in range(80)]
 audio_visualizer = NonBlockingAudioVisualizer(frequency_blocks=frequencies)
 #audio_visualizer = NonBlockingAudioVisualizer()
 
@@ -507,6 +522,8 @@ def lerp(t, p0, p1):
 
 threshold_vis_rects = [0 for x in range(len(frequencies)-1)]
 
+last_bar_heights = [0]*len(frequencies)
+
 # Draw loop
 while running:
     start = time.time()
@@ -570,16 +587,24 @@ while running:
             line.z0 = LINE_ZPOS
             line.z1 = LINE_ZPOS
 
-    # idea: track avg last 10 or so frames
-    # if higher than avg, quickly, smoothly, go down until below avg, then take new value
     # Draw the visualizer data
     visualizer_rects = audio_visualizer.get_last_visualizer_data()
 
+    # count = 0
     for x0, y0, x1, y1, color in visualizer_rects:
         #TODO: Since FPS is higher than visualization rate, interpolate the positions in between
 
+        # Kind of want to do this directly in the visualizer
+        # But I cant since that only runs in 48000/2048 fps
+
+        # Has to do it as a post process step
+        # if last_bar_heights[count] == y1:
+        #     y1 = y1 - (720/2 + 45 - y1) / 2
+
         canvas.create_rectangle(x0, y0+1, x1, y1+1, fill=color, outline=color)
 
+        # last_bar_heights[count] = y1
+        # count += 1
 
     # Update and measure frame time
     canvas.update()

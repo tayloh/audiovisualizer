@@ -74,9 +74,9 @@ fft_rect_bin_avg = []
 fig, ax = plt.subplots(1, figsize=(15, 7))
 
 x = numpy.linspace(0, SAMPLE_RATE / 2, fft_bins_before_mirror)
-line, = ax.semilogx(x, numpy.random.rand(fft_bins_before_mirror), '-', lw=2, basex=10)
+#line, = ax.semilogx(x, numpy.random.rand(fft_bins_before_mirror), '-', lw=2, basex=10)
 #line, = ax.semilogx(x, numpy.random.rand(fft_bins_before_mirror), '-', lw=2, basex=2)
-#line, = ax.plot(x, numpy.random.rand(fft_bins_before_mirror), '-', lw=2)
+line, = ax.plot(x, numpy.random.rand(fft_bins_before_mirror), '-', lw=2)
 #ax.set_yscale("log")
 #ax.set_xscale("log")
 

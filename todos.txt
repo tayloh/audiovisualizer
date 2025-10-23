@@ -1,6 +1,15 @@
 maybe:
-* gaussian smoothing in the temporal domain for each bin
-* semilog "plot" of bins, then in riemann fashion reconstruct the rectangles
-* gaussian smoothing over larger areas of bin space?
+* gaussian smoothing in the temporal domain for each bin -> used box weighted box filter instead
+* semilog "plot" of bins, then in riemann fashion reconstruct the rectangles -> have to use curves to make it look nice then
+* interpolate visualization between frames since fps is double that of vis
+
+* so apparently, temporal average normalization was completely broken, and all it did was multiply by 10, which worked great
+so that's what im now doing- no reason to do log "normalization" if I do average normalization I think either way, should test if it makes a difference
+unfortunate.. :(
+
+* is log normalization even working? yes
 
 https://www.audiolabs-erlangen.de/resources/MIR/FMP/C3/C3S1_FeatureSmoothing.html
+
+Audio loopback in windows (patch for pyaudio):
+https://github.com/s0d3s/PyAudioWPatch
